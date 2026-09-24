@@ -3,7 +3,7 @@
 Read **NVIDIA GPU memory (VRAM) vendor, type and temperature** on Linux — including VRAM
 temperatures that `nvidia-smi` does not report.
 
-[中文说明](#中文说明)
+**English** | [中文文档](README.zh-CN.md)
 
 ```
 $ sudo ./vraminfo
@@ -124,48 +124,3 @@ selection.
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-## 中文说明
-
-在 Linux 上读取 **NVIDIA 显卡的显存颗粒厂商、类型和显存温度**——包括 `nvidia-smi` 读不到的显存温度。
-
-### 功能
-
-* **厂商 / 类型**：走驱动自带的 NVAPI 桥接库（`libnvidia-api.so.1`），**不需要 root**，任何卡都能读；
-* **显存温度**：直接用 MMIO 读 GPU 寄存器（`/dev/mem` **只读**打开，**需要 root**）。
-  寄存器路径按 NVAPI 报告的**显存类型**自动选择（不依赖型号白名单）：
-  * GDDR6X（Ampere / Ada）：`BAR0+0xE2A8`，取低 12 位除以 32；
-  * GDDR7（Blackwell）：逐模块 DRAM 传感器（`0x9024C0 + p*0x4000`，有效位 nibble=0xF，MR-code 解码）；
-  * GDDR6 / GDDR5：颗粒本身没有可读传感器，如实报告"不支持"（这是显存颗粒的硬件属性，
-    不是软件限制——只有 GDDR6X 和 GDDR7 颗粒带片上温度传感器）。
-
-### 安装
-
-```bash
-git clone https://github.com/xzwgit/vraminfo.git
-cd vraminfo
-make                 # 或：gcc -O2 -Wall -o vraminfo vraminfo.c -ldl
-sudo make install    # 安装到 /usr/local/bin/vraminfo
-```
-
-前置条件：
-
-* Linux + NVIDIA 显卡 + 较新的驱动（NVAPI 桥接库 `libnvidia-api.so.1` 随驱动提供，R515 以后都有）；
-* 编译需要 `gcc` 和 `make`；
-* 读显存温度需要 **root**；部分内核还需在内核启动参数加 `iomem=relaxed`
-  （`/etc/default/grub` 里加，然后 `sudo update-grub && sudo reboot`），并关闭 Secure Boot。
-  很多发行版默认即可用。
-
-### 使用
-
-```bash
-sudo vraminfo                 # 表格输出（每张卡的显存热点温度）
-sudo vraminfo --per-module    # 逐个显存颗粒的温度
-sudo vraminfo --json          # JSON 输出（便于监控采集）
-sudo vraminfo --watch         # 每 2 秒刷新
-vraminfo                      # 普通用户运行：只能读厂商/类型，不读温度
-```
-
-**注意**：显存温度读取需要 root，且只做只读映射，不会写 GPU 任何寄存器。
