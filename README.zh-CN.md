@@ -20,7 +20,7 @@ PCI            DEVICE   MEMORY         MAKER     MEM TEMP      NOTE
 
 | 字段 | 数据来源 | 需要 root | 说明 |
 |---|---|---|---|
-| 板卡厂商（华硕 / 影驰 / 微星 …） | PCI 子系统 ID，配系统 `pci.ids` 解析 | 否 | 每张卡都有，不依赖驱动；JSON 里为 `board_vendor` |
+| 板卡厂商（华硕 / 影驰 / 微星 …） | PCI 子系统 ID，配系统 `pci.ids` 解析 | 否 | 每张卡都有，不依赖驱动；子系统 ID 不是板卡厂商时（如 NVIDIA 通用参考 ID `0x10de`）显示 **N/A** |
 | 显存厂商（Samsung / Hynix / Micron …） | NVAPI `NvAPI_GPU_GetRamMaker` | 否 | 驱动里记录的数据，任何卡都能读 |
 | 显存类型（GDDR5 / GDDR6 / GDDR6X / GDDR7） | NVAPI `NvAPI_GPU_GetRamType` | 否 | |
 | 显存温度 | GPU 寄存器（MMIO 直读） | **是** | 仅带传感器的显存类型（GDDR6X、GDDR7） |
@@ -75,6 +75,7 @@ JSON 示例：
       "device_id": "0x2204",
       "subsystem": "0x1043:0x87af",
       "board_vendor": "ASUSTeK Computer Inc.",
+      "board_vendor_id": "0x1043",
       "memory_maker": "Micron",
       "memory_type": "GDDR6X",
       "memory_maker_id": 10,

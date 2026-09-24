@@ -88,8 +88,13 @@ struct nvapi_gpu {
 /* The board partner lives in the PCI subsystem ID; readable on every card,
  * no root and no driver involvement. Names come from the system pci.ids
  * database when present, otherwise from this short table of common partners. */
+/* 0x10de is NVIDIA's own ID: on a graphics card it marks the reference /
+ * Founders subsystem rather than a board partner, so it is reported as
+ * "not identifiable" (N/A) instead of as a board vendor. */
+#define PCI_VENDOR_NVIDIA 0x10de
+
 static const struct { uint16_t id; const char *name; } board_vendors[] = {
-    { 0x10de, "NVIDIA" },        { 0x1043, "ASUSTeK" },   { 0x1458, "Gigabyte" },
+    { 0x1043, "ASUSTeK" },   { 0x1458, "Gigabyte" },
     { 0x1462, "MSI" },           { 0x196e, "PNY" },       { 0x19da, "ZOTAC" },
     { 0x3842, "EVGA" },          { 0x1b4c, "GALAX" },     { 0x1569, "Palit" },
     { 0x10b0, "Gainward" },      { 0x7377, "Colorful" },  { 0x1acc, "Inno3D" },
@@ -127,8 +132,10 @@ static const char *board_vendor_from_pci_ids(uint16_t id) {
     return NULL;
 }
 
-/* Short name for the table: built-in list first, pci.ids as fallback. */
+/* Short name for the table: built-in list first, pci.ids as fallback.
+ * Returns NULL when the subsystem ID does not name a board partner. */
 static const char *board_vendor_short(uint16_t id) {
+    if (id == PCI_VENDOR_NVIDIA) return NULL;
     for (size_t i = 0; i < sizeof board_vendors / sizeof board_vendors[0]; i++)
         if (board_vendors[i].id == id) return board_vendors[i].name;
     return board_vendor_from_pci_ids(id);
@@ -136,6 +143,7 @@ static const char *board_vendor_short(uint16_t id) {
 
 /* Full official name for JSON: pci.ids first, built-in list as fallback. */
 static const char *board_vendor_full(uint16_t id) {
+    if (id == PCI_VENDOR_NVIDIA) return NULL;
     const char *n = board_vendor_from_pci_ids(id);
     if (n) return n;
     for (size_t i = 0; i < sizeof board_vendors / sizeof board_vendors[0]; i++)
@@ -375,9 +383,12 @@ static void print_json(struct pci_gpu *g, int n, int per_module) {
         printf("      \"device_id\": \"0x%04x\",\n", x->device_id);
         printf("      \"subsystem\": \"0x%04x:0x%04x\",\n", x->sub_vendor, x->sub_device);
         {
+            /* N/A when the subsystem ID does not name a board partner (e.g. the
+             * generic NVIDIA reference ID); the raw ID stays in "subsystem". */
             const char *bv = board_vendor_full(x->sub_vendor);
             printf("      \"board_vendor\": %s%s%s,\n",
                    bv ? "\"" : "", bv ? bv : "null", bv ? "\"" : "");
+            printf("      \"board_vendor_id\": \"0x%04x\",\n", x->sub_vendor);
         }
         if (mk || tp) {
             printf("      \"memory_maker\": %s%s%s,\n", mk ? "\"" : "", mk ? mk : "null", mk ? "\"" : "");
@@ -410,8 +421,7 @@ static void print_table(struct pci_gpu *g, int n, int per_module) {
         char mem[24] = "-", mk[16] = "-", temp[160] = "-", dev[16], board[20];
         const char *bv = board_vendor_short(x->sub_vendor);
         snprintf(dev, sizeof dev, "0x%04x", x->device_id);
-        if (bv) snprintf(board, sizeof board, "%s", bv);
-        else    snprintf(board, sizeof board, "0x%04x", x->sub_vendor);
+        snprintf(board, sizeof board, "%s", bv ? bv : "N/A");
         if (x->have_ram) {
             const char *t = type_name(x->type), *m = maker_name(x->maker);
             if (t) snprintf(mem, sizeof mem, "%s", t); else snprintf(mem, sizeof mem, "type#%u", x->type);
