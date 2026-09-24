@@ -84,6 +84,65 @@ struct nvapi_gpu {
     int      have_ram;
 };
 
+/* ------------------------------------------------------- board (AIB) vendor */
+/* The board partner lives in the PCI subsystem ID; readable on every card,
+ * no root and no driver involvement. Names come from the system pci.ids
+ * database when present, otherwise from this short table of common partners. */
+static const struct { uint16_t id; const char *name; } board_vendors[] = {
+    { 0x10de, "NVIDIA" },        { 0x1043, "ASUSTeK" },   { 0x1458, "Gigabyte" },
+    { 0x1462, "MSI" },           { 0x196e, "PNY" },       { 0x19da, "ZOTAC" },
+    { 0x3842, "EVGA" },          { 0x1b4c, "GALAX" },     { 0x1569, "Palit" },
+    { 0x10b0, "Gainward" },      { 0x7377, "Colorful" },  { 0x1acc, "Inno3D" },
+    { 0x1849, "ASRock" },        { 0x1b0a, "Pegatron" },  { 0x1028, "Dell" },
+    { 0x103c, "HP" },            { 0x17aa, "Lenovo" },    { 0x1a03, "ASPEED" },
+};
+
+static const char *pci_ids_paths[] = {
+    "/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids",
+    "/usr/share/pci.ids", "/usr/local/share/pci.ids", NULL,
+};
+
+/* Look a 16-bit vendor ID up in pci.ids ("1043  ASUSTeK Computer Inc."). */
+static const char *board_vendor_from_pci_ids(uint16_t id) {
+    for (int i = 0; pci_ids_paths[i]; i++) {
+        FILE *f = fopen(pci_ids_paths[i], "r");
+        if (!f) continue;
+        char line[512];
+        while (fgets(line, sizeof line, f)) {
+            if (line[0] == '#' || line[0] == '\n') continue;
+            if (line[0] == '\t' || line[0] == ' ') continue;   /* device/class lines */
+            unsigned vid;
+            if (sscanf(line, "%4x", &vid) != 1) continue;
+            if (vid != id) continue;
+            /* name = rest of the line, trimmed */
+            char *p = line + 4;
+            while (*p == ' ' || *p == '\t') p++;
+            size_t n = strlen(p);
+            while (n && (p[n - 1] == '\n' || p[n - 1] == '\r' || p[n - 1] == ' ')) p[--n] = 0;
+            fclose(f);
+            return n ? strdup(p) : NULL;   /* small leak per call is fine for a one-shot tool */
+        }
+        fclose(f);
+    }
+    return NULL;
+}
+
+/* Short name for the table: built-in list first, pci.ids as fallback. */
+static const char *board_vendor_short(uint16_t id) {
+    for (size_t i = 0; i < sizeof board_vendors / sizeof board_vendors[0]; i++)
+        if (board_vendors[i].id == id) return board_vendors[i].name;
+    return board_vendor_from_pci_ids(id);
+}
+
+/* Full official name for JSON: pci.ids first, built-in list as fallback. */
+static const char *board_vendor_full(uint16_t id) {
+    const char *n = board_vendor_from_pci_ids(id);
+    if (n) return n;
+    for (size_t i = 0; i < sizeof board_vendors / sizeof board_vendors[0]; i++)
+        if (board_vendors[i].id == id) return board_vendors[i].name;
+    return NULL;
+}
+
 struct nvapi {
     void *lib;
     int   ready;
@@ -315,6 +374,11 @@ static void print_json(struct pci_gpu *g, int n, int per_module) {
         printf("    {\n      \"bdf\": \"%s\",\n", x->bdf);
         printf("      \"device_id\": \"0x%04x\",\n", x->device_id);
         printf("      \"subsystem\": \"0x%04x:0x%04x\",\n", x->sub_vendor, x->sub_device);
+        {
+            const char *bv = board_vendor_full(x->sub_vendor);
+            printf("      \"board_vendor\": %s%s%s,\n",
+                   bv ? "\"" : "", bv ? bv : "null", bv ? "\"" : "");
+        }
         if (mk || tp) {
             printf("      \"memory_maker\": %s%s%s,\n", mk ? "\"" : "", mk ? mk : "null", mk ? "\"" : "");
             printf("      \"memory_type\": %s%s%s,\n", tp ? "\"" : "", tp ? tp : "null", tp ? "\"" : "");
@@ -339,12 +403,15 @@ static void print_json(struct pci_gpu *g, int n, int per_module) {
 }
 
 static void print_table(struct pci_gpu *g, int n, int per_module) {
-    printf("%-14s %-8s %-14s %-9s %-13s %s\n",
-           "PCI", "DEVICE", "MEMORY", "MAKER", "MEM TEMP", "NOTE");
+    printf("%-14s %-8s %-11s %-14s %-9s %-16s %s\n",
+           "PCI", "DEVICE", "BOARD", "MEMORY", "MAKER", "MEM TEMP", "NOTE");
     for (int i = 0; i < n; i++) {
         struct pci_gpu *x = &g[i];
-        char mem[24] = "-", mk[16] = "-", temp[160] = "-", dev[16];
+        char mem[24] = "-", mk[16] = "-", temp[160] = "-", dev[16], board[20];
+        const char *bv = board_vendor_short(x->sub_vendor);
         snprintf(dev, sizeof dev, "0x%04x", x->device_id);
+        if (bv) snprintf(board, sizeof board, "%s", bv);
+        else    snprintf(board, sizeof board, "0x%04x", x->sub_vendor);
         if (x->have_ram) {
             const char *t = type_name(x->type), *m = maker_name(x->maker);
             if (t) snprintf(mem, sizeof mem, "%s", t); else snprintf(mem, sizeof mem, "type#%u", x->type);
@@ -360,8 +427,8 @@ static void print_table(struct pci_gpu *g, int n, int per_module) {
                 snprintf(temp, sizeof temp, "%d C", x->temp_c);
             }
         }
-        printf("%-14s %-8s %-14s %-9s %-13s %s\n",
-               x->bdf + (strlen(x->bdf) > 4 ? 5 : 0), dev, mem, mk, temp, x->temp_note);
+        printf("%-14s %-8s %-11s %-14s %-9s %-16s %s\n",
+               x->bdf + (strlen(x->bdf) > 4 ? 5 : 0), dev, board, mem, mk, temp, x->temp_note);
     }
 }
 

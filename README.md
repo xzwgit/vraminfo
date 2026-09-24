@@ -58,6 +58,7 @@ JSON example:
       "bdf": "0000:02:00.0",
       "device_id": "0x2204",
       "subsystem": "0x1043:0x87af",
+      "board_vendor": "ASUSTeK Computer Inc.",
       "memory_maker": "Micron",
       "memory_type": "GDDR6X",
       "memory_maker_id": 10,
@@ -73,6 +74,7 @@ JSON example:
 
 | Field | Source | Root needed | Notes |
 |---|---|---|---|
+| Board vendor (ASUSTeK / GALAX / MSI / …) | PCI subsystem ID, resolved with the system `pci.ids` | no | every card, driver not involved; full name in JSON as `board_vendor` |
 | Memory maker (Samsung / Hynix / Micron / …) | NVAPI `NvAPI_GPU_GetRamMaker` | no | read from the driver, works on every card |
 | Memory type (GDDR5 / GDDR6 / GDDR6X / GDDR7) | NVAPI `NvAPI_GPU_GetRamType` | no | |
 | Memory temperature | GPU registers over MMIO | **yes** | only on DRAM types that have a sensor (GDDR6X, GDDR7) |
