@@ -99,7 +99,7 @@ JSON 示例：
 
 | 显卡 | 显存 | 厂商/类型 | 温度来源 |
 |---|---|---|---|
-| RTX 3090 | Micron GDDR6X | ✔ | `0xE2A8`（与 HiveOS `nvtool` 交叉验证：同一寄存器、同一读数） |
+| RTX 3090 | Micron GDDR6X | ✔ | `0xE2A8`（与另一个独立实现的同寄存器读数交叉验证，数值一致） |
 | RTX 4090（48GB 改版卡） | Micron GDDR6X | ✔ | `0xE2A8`——`nvidia-smi` 显示 `N/A`，但此工具能读出真实温度 |
 | RTX 5090 | Samsung GDDR7 | ✔ | 逐模块 DQR 传感器 |
 | RTX 3060 | Samsung GDDR6 | ✔ | *无传感器——正确报告为不支持* |

@@ -107,7 +107,7 @@ Nothing is written to the GPU. The tool only ever maps pages `PROT_READ`.
 
 | GPU | Memory | Reported | Temperature source |
 |---|---|---|---|
-| RTX 3090 | Micron GDDR6X | ✔ | `0xE2A8` (cross-checked against HiveOS `nvtool` — same register, same value) |
+| RTX 3090 | Micron GDDR6X | ✔ | `0xE2A8` (cross-checked against another independent reading of the same register — values agree) |
 | RTX 4090 (48 GB mod) | Micron GDDR6X | ✔ | `0xE2A8` — readable even though `nvidia-smi` shows `N/A` |
 | RTX 5090 | Samsung GDDR7 | ✔ | per-module DQR sensors |
 | RTX 3060 | Samsung GDDR6 | ✔ | *no sensor — correctly reported unsupported* |
