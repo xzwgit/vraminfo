@@ -1,0 +1,7 @@
+vraminfo
+*.o
+*.bin
+build/
+dump_dqr
+test_remote.py
+publish.py
